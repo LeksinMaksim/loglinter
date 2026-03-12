@@ -3,6 +3,7 @@ package analyzer
 import (
 	"go/ast"
 	"go/token"
+	"go/types"
 	"regexp"
 	"strconv"
 	"strings"
@@ -50,6 +51,21 @@ func run(pass *analysis.Pass) (interface{}, error) {
 		}
 
 		if !logMethods[sel.Sel.Name] {
+			return
+		}
+
+		if obj, ok := pass.TypesInfo.Uses[sel.Sel].(*types.Func); ok {
+			pkg := obj.Pkg()
+			if pkg == nil {
+				return
+			}
+
+			pkgPath := pkg.Path()
+
+			if pkgPath != "log/slog" && pkgPath != "go.uber.org/zap" {
+				return
+			}
+		} else {
 			return
 		}
 
