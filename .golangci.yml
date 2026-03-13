@@ -8,3 +8,6 @@ linters:
       loglinter:
         type: "module"
         description: "checks log messages"
+        settings:
+          custom-patterns:
+            - "my_custom_secret"
