@@ -9,10 +9,29 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/golangci/plugin-module-register/register"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
 	"golang.org/x/tools/go/ast/inspector"
 )
+
+func init() {
+	register.Plugin("loglinter", New)
+}
+
+type LogLinterPlugin struct{}
+
+func New(conf any) (register.LinterPlugin, error) {
+	return &LogLinterPlugin{}, nil
+}
+
+func (p *LogLinterPlugin) BuildAnalyzers() ([]*analysis.Analyzer, error) {
+	return []*analysis.Analyzer{Analyzer}, nil
+}
+
+func (p *LogLinterPlugin) GetLoadMode() string {
+	return register.LoadModeTypesInfo
+}
 
 var Analyzer = &analysis.Analyzer{
 	Name:     "loglinter",
