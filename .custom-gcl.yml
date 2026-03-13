@@ -1,0 +1,6 @@
+version: v2.11.3
+
+plugins:
+  - module: 'github.com/LeksinMaksim/loglinter'
+    import: 'github.com/LeksinMaksim/loglinter/pkg/analyzer'
+    path: .
