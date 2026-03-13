@@ -1,0 +1,13 @@
+version: "2"
+
+linters-settings:
+  custom:
+    loglinter:
+      type: module
+      description: "checks log messages for complience with formatting and security rules"
+      original-url: github.com/LeksinMaksim/loglinter
+
+linters:
+  disable-all: true
+  enable:
+    - loglinter
