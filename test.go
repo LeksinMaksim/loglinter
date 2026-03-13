@@ -11,4 +11,5 @@ func main() {
 	slog.Info("server started!!")
 	slog.Info("user password:" + password)
 	slog.Debug("api_key:" + apiKey)
+	slog.Info("my_custom_secret:" + password)
 }
