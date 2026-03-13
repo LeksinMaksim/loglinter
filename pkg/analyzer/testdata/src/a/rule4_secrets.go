@@ -20,6 +20,7 @@ func TestRule4() {
 	sugar.Error("secret: 404")              // want "log message must not contain sensitive data"
 
 	slog.Info("user authenticated successfully")
+	slog.Warn(password)
 	slog.Debug("api request completed")
 	slog.Info("token validated")
 	slog.Warn("checking password strength")

@@ -41,6 +41,7 @@ var Analyzer = &analysis.Analyzer{
 }
 
 var sensitiveDataRegex = regexp.MustCompile(`(?i)(password|api_key|token|secret)\s*[:=]`)
+var allowedChars = regexp.MustCompile(`^[\p{L}0-9\s.,:=\-\[\]_]+$`)
 
 var logMethods = map[string]bool{
 	"Info": true, "Infof": true,
@@ -73,6 +74,7 @@ func run(pass *analysis.Pass) (interface{}, error) {
 			return
 		}
 
+		// Линтер работает только с log/slog и go.uber.org/zap
 		if obj, ok := pass.TypesInfo.Uses[sel.Sel].(*types.Func); ok {
 			pkg := obj.Pkg()
 			if pkg == nil {
@@ -97,10 +99,11 @@ func run(pass *analysis.Pass) (interface{}, error) {
 
 		firstArg := call.Args[0]
 
+		// Передается строковый литерал
 		if lit, ok := firstArg.(*ast.BasicLit); ok && lit.Kind == token.STRING {
 			msgString, _ = strconv.Unquote(lit.Value)
 			errorPos = lit.Pos()
-		} else if bin, ok := firstArg.(*ast.BinaryExpr); ok && bin.Op == token.ADD {
+		} else if bin, ok := firstArg.(*ast.BinaryExpr); ok && bin.Op == token.ADD { // Передается строковый литерал + переменная
 			if lit, ok := bin.X.(*ast.BasicLit); ok && lit.Kind == token.STRING {
 				msgString, _ = strconv.Unquote(lit.Value)
 				errorPos = bin.X.Pos()
@@ -121,7 +124,7 @@ func run(pass *analysis.Pass) (interface{}, error) {
 
 		// Лог-сообщения должны быть только на английском языке
 		for _, r := range runes {
-			if unicode.Is(unicode.Cyrillic, r) {
+			if unicode.IsLetter(r) && r > unicode.MaxASCII {
 				pass.Reportf(errorPos, "log message must be in English only")
 				break
 			}
@@ -131,14 +134,12 @@ func run(pass *analysis.Pass) (interface{}, error) {
 		hasSpecial := false
 		if strings.Contains(msgString, "...") {
 			hasSpecial = true
-		} else {
-			for _, r := range runes {
-				if r == '!' || r == '?' || unicode.Is(unicode.So, r) {
-					hasSpecial = true
-					break
-				}
-			}
 		}
+
+		if !allowedChars.MatchString(msgString) {
+			hasSpecial = true
+		}
+
 		if hasSpecial {
 			pass.Reportf(errorPos, "log message must not contain special characters or emojis")
 		}
