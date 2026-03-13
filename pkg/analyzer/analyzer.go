@@ -19,11 +19,13 @@ import (
 func init() {
 	register.Plugin("loglinter", New)
 	Analyzer.Flags.StringVar(&cliCustomPatterns, "custom-patterns", "", "comma-separated list of custom patterns for sensitive data checking")
+	Analyzer.Flags.StringVar(&cliDisabledRules, "disabled-rules", "", "comma-separated list of rules to disable (lowercase,english-only,special-chars,sensitive-data)")
 }
 
 var (
 	pluginCustomPatterns     []string
 	cliCustomPatterns        string
+	cliDisabledRules         string
 	activeSensitiveDataRegex *regexp.Regexp
 	regexOnce                sync.Once
 )
@@ -38,6 +40,15 @@ func New(conf any) (register.LinterPlugin, error) {
 			for _, p := range customPatterns {
 				if strP, ok := p.(string); ok {
 					pluginCustomPatterns = append(pluginCustomPatterns, strP)
+				}
+			}
+		}
+
+		// Парсим disabled-rules из настроек golangci-lint
+		if dr, ok := confMap["disabled-rules"].([]any); ok {
+			for _, r := range dr {
+				if strR, ok := r.(string); ok {
+					disabledRules = append(disabledRules, strR)
 				}
 			}
 		}
@@ -109,6 +120,16 @@ var logMethods = map[string]bool{
 }
 
 func run(pass *analysis.Pass) (interface{}, error) {
+	// Парсим CLI-флаг disabled-rules при standalone-запуске
+	if cliDisabledRules != "" && len(disabledRules) == 0 {
+		for _, r := range strings.Split(cliDisabledRules, ",") {
+			r = strings.TrimSpace(r)
+			if r != "" {
+				disabledRules = append(disabledRules, r)
+			}
+		}
+	}
+
 	inspect := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
 
 	nodeFilter := []ast.Node{
@@ -173,36 +194,44 @@ func run(pass *analysis.Pass) (interface{}, error) {
 		runes := []rune(msgString)
 
 		// Лог-сообщения начинаются со строчной буквы
-		firstChar := runes[0]
-		if unicode.IsLetter(firstChar) && !unicode.IsLower(firstChar) {
-			pass.Reportf(errorPos, "log message must start with a lowercase letter")
+		if isRuleEnabled(RuleLowercase) {
+			firstChar := runes[0]
+			if unicode.IsLetter(firstChar) && !unicode.IsLower(firstChar) {
+				pass.Reportf(errorPos, "log message must start with a lowercase letter")
+			}
 		}
 
 		// Лог-сообщения должны быть только на английском языке
-		for _, r := range runes {
-			if unicode.IsLetter(r) && r > unicode.MaxASCII {
-				pass.Reportf(errorPos, "log message must be in English only")
-				break
+		if isRuleEnabled(RuleEnglishOnly) {
+			for _, r := range runes {
+				if unicode.IsLetter(r) && r > unicode.MaxASCII {
+					pass.Reportf(errorPos, "log message must be in English only")
+					break
+				}
 			}
 		}
 
 		// Лог-сообщения не должны содержать спецсимволы или эмодзи
-		hasSpecial := false
-		if strings.Contains(msgString, "...") {
-			hasSpecial = true
-		}
+		if isRuleEnabled(RuleSpecialChars) {
+			hasSpecial := false
+			if strings.Contains(msgString, "...") {
+				hasSpecial = true
+			}
 
-		if !allowedChars.MatchString(msgString) {
-			hasSpecial = true
-		}
+			if !allowedChars.MatchString(msgString) {
+				hasSpecial = true
+			}
 
-		if hasSpecial {
-			pass.Reportf(errorPos, "log message must not contain special characters or emojis")
+			if hasSpecial {
+				pass.Reportf(errorPos, "log message must not contain special characters or emojis")
+			}
 		}
 
 		// Чувствительные данные
-		if getSensitiveDataRegex().MatchString(msgString) {
-			pass.Reportf(errorPos, "log message must not contain sensitive data")
+		if isRuleEnabled(RuleSensitiveData) {
+			if getSensitiveDataRegex().MatchString(msgString) {
+				pass.Reportf(errorPos, "log message must not contain sensitive data")
+			}
 		}
 	})
 	return nil, nil

@@ -10,4 +10,6 @@ linters:
         description: "checks log messages"
         settings:
           custom-patterns:
-            - "my_custom_secret"
+          #  - "my_custom_secret"
+          disabled-rules:
+          #  - "lowercase"
