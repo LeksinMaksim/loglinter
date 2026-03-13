@@ -91,3 +91,42 @@ go test ./pkg/analyzer/...
 Статический анализатор работает на этапе компиляции, поэтому он проверяем только те сообщения, содержания которых можно определить без запуска кода. Линтер корректно обрабатывает:
 1. **Строковые литералы**: `log.Info("starting server")`
 2. **Простую конкатенацию (строка + переменная):** `log.Info("user password: " + password)` - проверяется только строковая часть литерала.
+
+
+### Пример использования
+**Использование как самостоятельной утилиты:**
+```shell
+loglinter  feat/bonus-config  v1.26.1 ❯ go build -o loglinter ./cmd/loglinter/main.go
+loglinter  feat/bonus-config ?  v1.26.1 ❯ ./loglinter ./test.go
+/Users/akogare/Study/Golang/loglinter/test.go:9:12: log message must start with a lowercase letter
+/Users/akogare/Study/Golang/loglinter/test.go:10:13: log message must be in English only
+/Users/akogare/Study/Golang/loglinter/test.go:11:12: log message must not contain special characters or emojis
+/Users/akogare/Study/Golang/loglinter/test.go:12:12: log message must not contain sensitive data
+/Users/akogare/Study/Golang/loglinter/test.go:13:13: log message must not contain sensitive data
+/Users/akogare/Study/Golang/loglinter/test.go:14:12: log message must not contain sensitive data
+```
+
+**Использование как плагина для golangci-lint:**
+```shell
+loglinter  feat/bonus-config ?  v1.26.1 ❯ ./custom-gcl run ./test.go
+test.go:9:12: log message must start with a lowercase letter (loglinter)
+        slog.Info("Starting server on port 8080")
+                  ^
+test.go:10:13: log message must be in English only (loglinter)
+        slog.Error("ошибка подключения к бд")
+                   ^
+test.go:11:12: log message must not contain special characters or emojis (loglinter)
+        slog.Info("server started!!")
+                  ^
+test.go:12:12: log message must not contain sensitive data (loglinter)
+        slog.Info("user password:" + password)
+                  ^
+test.go:13:13: log message must not contain sensitive data (loglinter)
+        slog.Debug("api_key:" + apiKey)
+                   ^
+test.go:14:12: log message must not contain sensitive data (loglinter)
+        slog.Info("my_custom_secret:" + password)
+                  ^
+6 issues:
+* loglinter: 6
+```
